@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  db:
+    image: mariadb:10.6
+    container_name: karaoke_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+    volumes:
+      - db_data:/var/lib/mysql
+
+  php:
+    build:
+      context: .
+      dockerfile: Dockerfile.php
+    container_name: karaoke_php
+    restart: unless-stopped
+    volumes:
+      - .:/var/www/html:z
+    depends_on:
+      - db
+      - python-api
+
+  nginx:
+    image: nginx:alpine
+    container_name: karaoke_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - php
+
+  python-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.python
+    container_name: karaoke_python
+    restart: unless-stopped
+    environment:
+      - YANDEX_MUSIC_TOKEN=${YANDEX_MUSIC_TOKEN}
+    volumes:
+      - ./public/media:/app/public/media:z
+
+volumes:
+  db_data:
