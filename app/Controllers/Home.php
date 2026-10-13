@@ -9,9 +9,21 @@ class Home extends BaseController
         if (!session()->get('isLoggedIn')) {
             return redirect()->to('/login');
         }
+
+        $songModel = new SongModel();
+        $songs = $songModel->orderBy('id', 'DESC')->findAll();
+
+        $currentId = $this->request->getGet('song_id');
+        $activeSong = $currentId ? $songModel->find($currentId) : null;
+
+        if (!$activeSong && !empty($songs)) {
+            $activeSong = $songs[0];
+        }
+
         return view('player', [
             'title' => 'Караоке-плеер',
-            'song'  => (new SongModel())->orderBy('id', 'DESC')->first()
+            'songs' => $songs,
+            'song'  => $activeSong
         ]);
     }
 
@@ -23,7 +35,8 @@ class Home extends BaseController
     public function search()
     {
         $query = $this->request->getPost('search_query');
-        $userToken = session()->get('yandex_token'); // <-- Достаем токен
+        // достаем токен шоб питон не ругался
+        $userToken = session()->get('yandex_token');
 
         $ch = curl_init('http://python-api:5000/api/search');
         curl_setopt_array($ch, [
@@ -32,7 +45,7 @@ class Home extends BaseController
             CURLOPT_POST => true,
             CURLOPT_POSTFIELDS => json_encode([
                 'query' => $query,
-                'token' => $userToken // <-- Отправляем токен в Python
+                'token' => $userToken
             ]),
             CURLOPT_TIMEOUT => 20
         ]);
@@ -50,7 +63,8 @@ class Home extends BaseController
             return "Ошибка: Не передан ID трека.";
         }
 
-        $userToken = session()->get('yandex_token'); // <-- Достаем токен
+        // тот же токен, без него яша не отдаст трек
+        $userToken = session()->get('yandex_token');
 
         $ch = curl_init('http://python-api:5000/api/download');
         curl_setopt_array($ch, [
@@ -59,7 +73,7 @@ class Home extends BaseController
             CURLOPT_POST => true,
             CURLOPT_POSTFIELDS => json_encode([
                 'track_id' => $track_id,
-                'token'    => $userToken // <-- Отправляем токен в Python
+                'token'    => $userToken
             ]),
             CURLOPT_TIMEOUT => 120
         ]);
@@ -76,7 +90,8 @@ class Home extends BaseController
 
         if ($result && !empty($result['success'])) {
             try {
-                $model = new \App\Models\SongModel();
+                $model = new SongModel();
+
                 $model->insert([
                     'title'       => $result['title'] ?? 'Неизвестно',
                     'artist'      => $result['artist'] ?? 'Неизвестно',
@@ -94,5 +109,4 @@ class Home extends BaseController
 
         return redirect()->to('/');
     }
-
 }
